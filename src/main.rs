@@ -9,7 +9,10 @@ const PROGRAM_DIR_NAME: &str = ".virt-manager";
 
 fn main() {
     init_program_directory();
+    start_interactive_mode();
+}
 
+fn start_interactive_mode() {
     loop {
         let input = get_user_input();
         parse_user_input(&input);
