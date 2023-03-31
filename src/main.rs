@@ -11,7 +11,7 @@ const PROGRAM_DIR_NAME: &str = ".virt-manager";
 #[derive(Serialize, Deserialize)]
 struct VmDetails {
     name: String,
-    cpu: u8,
+    smp: u8,
     ram: u8,
     kvm: bool,
 }
@@ -20,8 +20,8 @@ impl std::fmt::Display for VmDetails {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
             f,
-            "Name: {} | Cpu: {} cores | Ram: {}GB | Kvm: {}",
-            self.name, self.cpu, self.ram, self.kvm
+            "Name: {} | Smp: {} vcpus | Ram: {}GB | Kvm: {}",
+            self.name, self.smp, self.ram, self.kvm
         )
     }
 }
@@ -87,7 +87,7 @@ fn read_vm_details(path: &str) -> VmDetails {
 
     VmDetails {
         name: details.name,
-        cpu: details.cpu,
+        smp: details.smp,
         ram: details.ram,
         kvm: details.kvm,
     }
