@@ -3,7 +3,7 @@ use std::env;
 use std::fs::{self, File};
 use std::io::{self, Read, Write};
 use std::path::{Path, PathBuf};
-use std::process::exit;
+use std::process::{exit, Command};
 
 const VERSION: &str = "0.1.0";
 const PROGRAM_DIR_NAME: &str = ".virt-manager";
@@ -52,6 +52,9 @@ fn parse_user_input(input: &str) {
                 println!("{vm}");
             }
         }
+        "start" => {
+            start_vm();
+        }
         "quit" => {
             exit(0);
         }
@@ -59,6 +62,58 @@ fn parse_user_input(input: &str) {
         _ => {
             println!("Command '{input}' is not supported!");
         }
+    }
+}
+
+fn start_vm() {
+    print!("Enter the virtual machine name: ");
+    io::stdout().flush().unwrap();
+
+    let mut name = String::new();
+    io::stdin()
+        .read_line(&mut name)
+        .expect("Failed to read the name");
+
+    let name = name.trim().to_lowercase();
+    let vms = get_vm_details();
+
+    if let Some(vm) = vms.iter().find(|vm| vm.name == name) {
+        let mut vm_args: Vec<&str> = vec![];
+
+        if vm.kvm {
+            vm_args.push("-enable-kvm");
+        }
+
+        let ram_str = vm.ram.to_string() + "G";
+        vm_args.extend(["-m", &ram_str].iter());
+
+        let smp_str = vm.smp.to_string();
+        vm_args.extend(["-smp", &smp_str].iter());
+
+        vm_args.extend(["-boot", "menu=on"].iter());
+        vm_args.extend(
+            [
+                "-drive",
+                "file=/home/viktor/.virt-manager/manjaro-xfce/image.img",
+            ]
+            .iter(),
+        );
+        vm_args.extend(["-cpu", "host"].iter());
+        vm_args.extend(["-device", "virtio-vga-gl"].iter());
+        vm_args.extend(["-display", "sdl,gl=on"].iter());
+
+        let mut child_process = Command::new("qemu-system-x86_64")
+            .args(vm_args)
+            .spawn()
+            .expect("Failed to execute the process.");
+
+        let exit_status = child_process
+            .wait()
+            .expect("Failed to wait for the child process");
+
+        println!("{exit_status}");
+    } else {
+        println!("{name} not found!");
     }
 }
 
