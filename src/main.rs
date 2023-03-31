@@ -39,7 +39,9 @@ fn start_interactive_mode() {
 }
 
 fn parse_user_input(input: &str) {
-    match input {
+    let args: Vec<&str> = input.split_whitespace().collect();
+
+    match args[0] {
         "help" => {
             print_usage();
         }
@@ -53,7 +55,11 @@ fn parse_user_input(input: &str) {
             }
         }
         "start" => {
-            start_vm();
+            if args.len() > 1 {
+                start_vm(Some(args[1]));
+            } else {
+                start_vm(None);
+            }
         }
         "quit" => {
             exit(0);
@@ -65,16 +71,23 @@ fn parse_user_input(input: &str) {
     }
 }
 
-fn start_vm() {
-    print!("Enter the virtual machine name: ");
-    io::stdout().flush().unwrap();
+fn start_vm(vm_name: Option<&str>) {
+    let name;
 
-    let mut name = String::new();
-    io::stdin()
-        .read_line(&mut name)
-        .expect("Failed to read the name");
+    if let Some(n) = vm_name {
+        name = n.to_string();
+    } else {
+        print!("Enter the virtual machine name: ");
+        io::stdout().flush().unwrap();
 
-    let name = name.trim().to_lowercase();
+        let mut input = String::new();
+        io::stdin()
+            .read_line(&mut input)
+            .expect("Failed to read the name");
+
+        name = input.trim().to_lowercase();
+    }
+
     let vms = get_vm_details();
 
     if let Some(vm) = vms.iter().find(|vm| vm.name == name) {
