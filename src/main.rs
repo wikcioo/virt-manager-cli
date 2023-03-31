@@ -1,11 +1,30 @@
+use serde::{Deserialize, Serialize};
 use std::env;
-use std::fs;
-use std::io::{self, Write};
+use std::fs::{self, File};
+use std::io::{self, Read, Write};
 use std::path::{Path, PathBuf};
 use std::process::exit;
 
 const VERSION: &str = "0.1.0";
 const PROGRAM_DIR_NAME: &str = ".virt-manager";
+
+#[derive(Serialize, Deserialize)]
+struct VmDetails {
+    name: String,
+    cpu: u8,
+    ram: u8,
+    kvm: bool,
+}
+
+impl std::fmt::Display for VmDetails {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "Name: {} | Cpu: {} cores | Ram: {}GB | Kvm: {}",
+            self.name, self.cpu, self.ram, self.kvm
+        )
+    }
+}
 
 fn main() {
     init_program_directory();
@@ -27,6 +46,9 @@ fn parse_user_input(input: &str) {
         "version" => {
             println!("Version: {VERSION}");
         }
+        "list" => {
+            list_vms();
+        }
         "quit" => {
             exit(0);
         }
@@ -34,6 +56,40 @@ fn parse_user_input(input: &str) {
         _ => {
             println!("Command '{input}' is not supported!");
         }
+    }
+}
+
+fn list_vms() {
+    let program_directory = get_program_directory_abs_path();
+    if let Ok(entries) = fs::read_dir(&program_directory) {
+        for entry in entries.flatten() {
+            if entry.file_type().unwrap().is_dir() {
+                if let Some(file_name) = entry.file_name().to_str() {
+                    let vm_path = program_directory.clone() + "/" + file_name;
+                    let vm = read_vm_details(&vm_path);
+                    println!("{vm}");
+                }
+            }
+        }
+    }
+}
+
+fn read_vm_details(path: &str) -> VmDetails {
+    let config_path = path.to_owned() + "/config.json";
+    let mut file =
+        File::open(config_path).expect("Failed to open configuration file for {config_path}");
+
+    let mut data = String::new();
+    file.read_to_string(&mut data)
+        .expect("Unable to read the file");
+
+    let details: VmDetails = serde_json::from_str(&data).expect("Failed to parse json file");
+
+    VmDetails {
+        name: details.name,
+        cpu: details.cpu,
+        ram: details.ram,
+        kvm: details.kvm,
     }
 }
 
