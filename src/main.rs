@@ -48,6 +48,13 @@ fn parse_user_input(input: &str) {
         "version" => {
             println!("Version: {VERSION}");
         }
+        "dusage" => {
+            let size_bytes = get_dir_size(&get_program_directory_abs_path());
+            println!(
+                "Disk usage: {:.2}GB",
+                size_bytes as f64 / 1024_f64.powf(3.0)
+            );
+        }
         "list" => {
             let vms = get_vm_details();
             for vm in vms {
@@ -69,6 +76,22 @@ fn parse_user_input(input: &str) {
             println!("Command '{input}' is not supported!");
         }
     }
+}
+
+fn get_dir_size(path: &str) -> u64 {
+    let mut total_size: u64 = 0;
+
+    for entry in fs::read_dir(path).unwrap() {
+        let entry = entry.unwrap();
+
+        if entry.file_type().unwrap().is_file() {
+            total_size += entry.metadata().unwrap().len();
+        } else if entry.file_type().unwrap().is_dir() {
+            total_size += get_dir_size(entry.path().to_str().unwrap());
+        }
+    }
+
+    total_size
 }
 
 fn start_vm(vm_name: Option<&str>) {
