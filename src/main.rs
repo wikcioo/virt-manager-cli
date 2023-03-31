@@ -91,13 +91,11 @@ fn start_vm() {
         vm_args.extend(["-smp", &smp_str].iter());
 
         vm_args.extend(["-boot", "menu=on"].iter());
-        vm_args.extend(
-            [
-                "-drive",
-                "file=/home/viktor/.virt-manager/manjaro-xfce/image.img",
-            ]
-            .iter(),
-        );
+
+        let drive =
+            "file=".to_owned() + &get_program_directory_abs_path() + "/" + &name + "/image.img";
+        vm_args.extend(["-drive", &drive].iter());
+
         vm_args.extend(["-cpu", "host"].iter());
         vm_args.extend(["-device", "virtio-vga-gl"].iter());
         vm_args.extend(["-display", "sdl,gl=on"].iter());
