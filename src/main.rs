@@ -47,7 +47,10 @@ fn parse_user_input(input: &str) {
             println!("Version: {VERSION}");
         }
         "list" => {
-            list_vms();
+            let vms = get_vm_details();
+            for vm in vms {
+                println!("{vm}");
+            }
         }
         "quit" => {
             exit(0);
@@ -59,19 +62,22 @@ fn parse_user_input(input: &str) {
     }
 }
 
-fn list_vms() {
+fn get_vm_details() -> Vec<VmDetails> {
+    let mut vm_details: Vec<VmDetails> = vec![];
     let program_directory = get_program_directory_abs_path();
+
     if let Ok(entries) = fs::read_dir(&program_directory) {
         for entry in entries.flatten() {
             if entry.file_type().unwrap().is_dir() {
                 if let Some(file_name) = entry.file_name().to_str() {
                     let vm_path = program_directory.clone() + "/" + file_name;
-                    let vm = read_vm_details(&vm_path);
-                    println!("{vm}");
+                    vm_details.push(read_vm_details(&vm_path));
                 }
             }
         }
     }
+
+    vm_details
 }
 
 fn read_vm_details(path: &str) -> VmDetails {
