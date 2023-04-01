@@ -15,14 +15,15 @@ struct VmDetails {
     smp: u8,
     ram: u8,
     kvm: bool,
+    os_installed: bool,
 }
 
 impl std::fmt::Display for VmDetails {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
             f,
-            "Name: {} | Smp: {} vcpus | Ram: {}GB | Kvm: {}",
-            self.name, self.smp, self.ram, self.kvm
+            "Name: {} | Smp: {} vcpus | Ram: {}GB | Kvm: {} | Os installed: {}",
+            self.name, self.smp, self.ram, self.kvm, self.os_installed
         )
     }
 }
@@ -218,6 +219,15 @@ fn start_vm(vm_name: Option<&str>) {
             vm_args.push("-enable-kvm");
         }
 
+        let iso_path = get_program_directory_abs_path() + "/" + &name + "/" + &name + ".iso";
+        if !vm.os_installed {
+            if !Path::new(&iso_path).exists() {
+                eprintln!("Missing {iso_path} file!");
+                return;
+            }
+            vm_args.extend(["-cdrom", &iso_path].iter());
+        }
+
         let ram_str = vm.ram.to_string() + "G";
         vm_args.extend(["-m", &ram_str].iter());
 
@@ -283,6 +293,7 @@ fn read_vm_details(path: &str) -> VmDetails {
         smp: details.smp,
         ram: details.ram,
         kvm: details.kvm,
+        os_installed: details.os_installed,
     }
 }
 
