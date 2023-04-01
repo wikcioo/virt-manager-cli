@@ -1,4 +1,5 @@
 use serde::{Deserialize, Serialize};
+use serde_json::json;
 use std::env;
 use std::fs::{self, File};
 use std::io::{self, Read, Write};
@@ -68,6 +69,9 @@ fn parse_user_input(input: &str) {
                 start_vm(None);
             }
         }
+        "create" => {
+            create_vm();
+        }
         "quit" => {
             exit(0);
         }
@@ -76,6 +80,100 @@ fn parse_user_input(input: &str) {
             println!("Command '{input}' is not supported!");
         }
     }
+}
+
+fn create_vm() {
+    let name = get_user_input_as_str("Name: ").to_lowercase();
+
+    let smp: u8 = get_user_input_until_valid("Virtual CPUs: ");
+
+    let ram: u8 = get_user_input_until_valid("Ram size in GB: ");
+
+    let input: String = get_user_input_until_valid("Enable kvm [Y/n]: ");
+    let kvm = input.is_empty() || input == "Y" || input == "y";
+
+    let image_size: String = get_user_input_until_valid("Image size in GB: ");
+
+    let config = json!({
+        "name": name,
+        "smp": smp,
+        "ram": ram,
+        "kvm": kvm
+    });
+
+    let vm_dir = get_program_directory_abs_path() + "/" + &name;
+    if let Err(e) = fs::create_dir(&vm_dir) {
+        eprintln!("Error creating directory: {e}");
+        return;
+    }
+
+    println!("Created directory for {name}");
+
+    let mut file = match File::create(vm_dir.clone() + "/config.json") {
+        Ok(val) => val,
+        Err(e) => {
+            eprintln!("Error creating {name}/config.json: {e}");
+            return;
+        }
+    };
+
+    let bytes_to_write = [config.to_string().as_bytes(), b"\n"].concat();
+    if let Err(e) = file.write(&bytes_to_write) {
+        eprintln!("Failed to write to {name}/config.json: {e}");
+    }
+
+    let image_path = vm_dir + "/image.img";
+    let image_size = image_size + "G";
+
+    let mut child_process = Command::new("qemu-img")
+        .args(["create", "-f", "qcow2", &image_path, &image_size].iter())
+        .spawn()
+        .expect("Failed to spawn qemu-img");
+
+    let exit_status = child_process
+        .wait()
+        .expect("Failed to wait for the child process");
+
+    println!("{exit_status}");
+}
+
+fn get_user_input_until_valid<T: std::str::FromStr>(prompt: &str) -> T
+where
+    <T as std::str::FromStr>::Err: std::fmt::Display,
+{
+    let mut input: T;
+    'l: loop {
+        let failed;
+
+        input = match get_user_input_as_str(prompt).parse() {
+            Ok(val) => {
+                failed = false;
+                val
+            }
+            Err(e) => {
+                eprintln!("Error: {e}");
+                continue 'l;
+            }
+        };
+
+        if !failed {
+            break;
+        }
+    }
+
+    input
+}
+
+fn get_user_input_as_str(prompt: &str) -> String {
+    let mut input = String::new();
+
+    print!("{prompt}");
+    io::stdout().flush().unwrap();
+    io::stdin()
+        .read_line(&mut input)
+        .expect("Failed to read line");
+
+    input.trim().to_owned()
 }
 
 fn get_dir_size(path: &str) -> u64 {
