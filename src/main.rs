@@ -73,6 +73,13 @@ fn parse_user_input(input: &str) {
         "create" => {
             create_vm();
         }
+        "delete" => {
+            if args.len() > 1 {
+                delete_vm(Some(args[1]));
+            } else {
+                delete_vm(None);
+            }
+        }
         "quit" => {
             exit(0);
         }
@@ -271,6 +278,32 @@ fn start_vm(vm_name: Option<&str>) {
         println!("{exit_status}");
     } else {
         println!("{name} not found!");
+    }
+}
+
+fn delete_vm(vm_name: Option<&str>) {
+    let name;
+
+    if let Some(n) = vm_name {
+        name = n.to_string();
+    } else {
+        print!("Enter the virtual machine name: ");
+        io::stdout().flush().unwrap();
+
+        let mut input = String::new();
+        io::stdin()
+            .read_line(&mut input)
+            .expect("Failed to read the name");
+
+        name = input.trim().to_lowercase();
+    }
+
+    let vm_dir = get_program_directory_abs_path() + "/" + &name;
+    if Path::new(&vm_dir).exists() {
+        fs::remove_dir_all(vm_dir).unwrap();
+        println!("Deleted '{name}' virtual machine from disk");
+    } else {
+        eprintln!("Virtual machine '{name}' does not exist!");
     }
 }
 
