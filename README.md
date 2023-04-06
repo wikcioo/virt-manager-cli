@@ -5,10 +5,11 @@
 A command-line program to mange your virtual machines, based on QEMU - the open-source virtualization software.
 
 ## Features:
-- [x] List
-- [x] Start
-- [x] Get disk usage
-- [ ] Create
+* Create
+* Delete
+* Start
+* List
+* Get disk usage
 
 ## How to run?
 **Note**: this project has only been tested on Linux
