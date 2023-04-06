@@ -99,7 +99,8 @@ fn create_vm() {
         "name": name,
         "smp": smp,
         "ram": ram,
-        "kvm": kvm
+        "kvm": kvm,
+        "os_installed": false
     });
 
     let vm_dir = get_program_directory_abs_path() + "/" + &name;
