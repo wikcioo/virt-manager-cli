@@ -194,6 +194,13 @@ fn get_dir_size(path: &str) -> u64 {
     total_size
 }
 
+fn get_file_size(path_to_file: &str) -> Result<u64, std::io::Error> {
+    match fs::metadata(path_to_file) {
+        Ok(val) => Ok(val.len()),
+        Err(e) => Err(e),
+    }
+}
+
 fn start_vm(vm_name: Option<&str>) {
     let name;
 
@@ -212,6 +219,7 @@ fn start_vm(vm_name: Option<&str>) {
     }
 
     let vms = get_vm_details();
+    let vm_path = get_program_directory_abs_path() + "/" + &name;
 
     if let Some(vm) = vms.iter().find(|vm| vm.name == name) {
         let mut vm_args: Vec<&str> = vec![];
@@ -220,7 +228,8 @@ fn start_vm(vm_name: Option<&str>) {
             vm_args.push("-enable-kvm");
         }
 
-        let iso_path = get_program_directory_abs_path() + "/" + &name + "/" + &name + ".iso";
+        let iso_path = vm_path.clone() + "/" + &name + ".iso";
+        let image_size = get_file_size(&(vm_path.clone() + "/image.img")).unwrap();
         if !vm.os_installed {
             if !Path::new(&iso_path).exists() {
                 eprintln!("Missing {iso_path} file!");
@@ -237,8 +246,7 @@ fn start_vm(vm_name: Option<&str>) {
 
         vm_args.extend(["-boot", "menu=on"].iter());
 
-        let drive =
-            "file=".to_owned() + &get_program_directory_abs_path() + "/" + &name + "/image.img";
+        let drive = "file=".to_owned() + &vm_path + "/image.img";
         vm_args.extend(["-drive", &drive].iter());
 
         vm_args.extend(["-cpu", "host"].iter());
@@ -254,10 +262,31 @@ fn start_vm(vm_name: Option<&str>) {
             .wait()
             .expect("Failed to wait for the child process");
 
+        let image_size_after_run = get_file_size(&(vm_path.clone() + "/image.img")).unwrap();
+        if image_size_after_run != image_size && !vm.os_installed {
+            println!("Marking {} as vm with os installed", vm.name);
+            vm_mark_os_installed(&(vm_path + "/config.json"));
+        }
+
         println!("{exit_status}");
     } else {
         println!("{name} not found!");
     }
+}
+
+fn vm_mark_os_installed(file_path: &str) {
+    let mut file = File::open(file_path).unwrap();
+    let mut file_content = String::new();
+    file.read_to_string(&mut file_content).unwrap();
+
+    let mut vm: VmDetails = serde_json::from_str(&file_content).unwrap();
+    vm.os_installed = true;
+
+    let binding = serde_json::to_string(&vm).unwrap();
+    let new_file_content = [binding.as_bytes(), b"\n"].concat();
+
+    let mut file = File::create(file_path).unwrap();
+    file.write_all(&new_file_content).unwrap();
 }
 
 fn get_vm_details() -> Vec<VmDetails> {
