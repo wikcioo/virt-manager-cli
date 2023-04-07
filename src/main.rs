@@ -1,5 +1,6 @@
 use serde::{Deserialize, Serialize};
 use serde_json::json;
+use std::cmp::Ordering;
 use std::env;
 use std::fs::{self, File};
 use std::io::{self, Read, Write};
@@ -41,8 +42,10 @@ fn main() {
 }
 
 fn start_interactive_mode() {
+    let mut cmd_history = get_cmd_history();
+
     loop {
-        let input = get_user_input();
+        let input = get_user_input(&mut cmd_history);
         parse_user_input(&input);
     }
 }
@@ -448,10 +451,11 @@ fn put_text_after_prompt(
     move_cursor_to_pos(stdout, x, y);
 }
 
-fn get_user_input() -> String {
+fn get_user_input(cmd_history: &mut Vec<String>) -> String {
     let mut stdout = io::stdout().into_raw_mode().unwrap();
     let mut input = String::new();
     let mut write_index = 0;
+    let mut cmd_his_index = cmd_history.len();
     let prompt = "[virt-manager]# ".to_string();
 
     let mut prompt_with_ansi = prompt.clone();
@@ -466,19 +470,33 @@ fn get_user_input() -> String {
     for c in io::stdin().keys() {
         match c.unwrap() {
             Key::Up => {
+                cmd_his_index = cmd_his_index.saturating_sub(1);
+
                 put_text_after_prompt(
                     &mut stdout,
                     prompt.len(),
-                    "Up arrow pressed",
+                    &cmd_history[cmd_his_index],
                     &mut input,
                     &mut write_index,
                 );
             }
             Key::Down => {
+                let text_to_print: &str = match cmd_his_index.cmp(&(cmd_history.len() - 1)) {
+                    Ordering::Less => {
+                        cmd_his_index += 1;
+                        &cmd_history[cmd_his_index]
+                    }
+                    Ordering::Equal => {
+                        cmd_his_index += 1;
+                        ""
+                    }
+                    Ordering::Greater => "",
+                };
+
                 put_text_after_prompt(
                     &mut stdout,
                     prompt.len(),
-                    "Down arrow pressed",
+                    text_to_print,
                     &mut input,
                     &mut write_index,
                 );
@@ -542,6 +560,27 @@ fn get_user_input() -> String {
     }
 
     input.trim().to_string()
+}
+
+fn get_cmd_history() -> Vec<String> {
+    let his_file = get_program_directory_abs_path() + "/.history";
+
+    if !Path::new(&his_file).exists() {
+        File::create(&his_file).unwrap();
+    }
+
+    let mut file = File::open(&his_file).unwrap();
+
+    let mut command_string = String::new();
+    file.read_to_string(&mut command_string).unwrap();
+
+    let commands = command_string
+        .trim()
+        .split('\n')
+        .map(|s| s.trim().to_string())
+        .collect();
+
+    commands
 }
 
 fn print_usage() {
