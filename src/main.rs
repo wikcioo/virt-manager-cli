@@ -43,49 +43,50 @@ fn start_interactive_mode() {
 fn parse_user_input(input: &str) {
     let args: Vec<&str> = input.split_whitespace().collect();
 
-    match args[0] {
-        "help" => {
-            print_usage();
-        }
-        "version" => {
-            println!("Version: {VERSION}");
-        }
-        "dusage" => {
-            let size_bytes = get_dir_size(&get_program_directory_abs_path());
-            println!(
-                "Disk usage: {:.2}GB",
-                size_bytes as f64 / 1024_f64.powf(3.0)
-            );
-        }
-        "list" => {
-            let vms = get_vm_details();
-            for vm in vms {
-                println!("{vm}");
+    if !args.is_empty() {
+        match args[0] {
+            "help" => {
+                print_usage();
             }
-        }
-        "start" => {
-            if args.len() > 1 {
-                start_vm(Some(args[1]));
-            } else {
-                start_vm(None);
+            "version" => {
+                println!("Version: {VERSION}");
             }
-        }
-        "create" => {
-            create_vm();
-        }
-        "delete" => {
-            if args.len() > 1 {
-                delete_vm(Some(args[1]));
-            } else {
-                delete_vm(None);
+            "dusage" => {
+                let size_bytes = get_dir_size(&get_program_directory_abs_path());
+                println!(
+                    "Disk usage: {:.2}GB",
+                    size_bytes as f64 / 1024_f64.powf(3.0)
+                );
             }
-        }
-        "quit" => {
-            exit(0);
-        }
-        "" => {}
-        _ => {
-            println!("Command '{input}' is not supported!");
+            "list" => {
+                let vms = get_vm_details();
+                for vm in vms {
+                    println!("{vm}");
+                }
+            }
+            "start" => {
+                if args.len() > 1 {
+                    start_vm(Some(args[1]));
+                } else {
+                    start_vm(None);
+                }
+            }
+            "create" => {
+                create_vm();
+            }
+            "delete" => {
+                if args.len() > 1 {
+                    delete_vm(Some(args[1]));
+                } else {
+                    delete_vm(None);
+                }
+            }
+            "quit" => {
+                exit(0);
+            }
+            _ => {
+                println!("Command '{input}' is not supported!");
+            }
         }
     }
 }
