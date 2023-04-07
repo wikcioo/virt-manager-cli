@@ -5,6 +5,13 @@ use std::fs::{self, File};
 use std::io::{self, Read, Write};
 use std::path::{Path, PathBuf};
 use std::process::{exit, Command};
+use termion::raw::RawTerminal;
+use termion::{
+    cursor::{self, DetectCursorPos},
+    event::Key,
+    input::TermRead,
+    raw::IntoRawMode,
+};
 
 const VERSION: &str = "0.1.0";
 const PROGRAM_DIR_NAME: &str = ".virt-manager";
@@ -395,14 +402,144 @@ fn create_program_directory(path: &str) {
     println!("Created program directory");
 }
 
-fn get_user_input() -> String {
-    let mut input = String::new();
-    print!("[virt-manager]\x1b[32m#\x1b[0m ");
+#[derive(PartialEq)]
+enum MoveDir {
+    Left,
+    Right,
+}
 
+fn move_cursor_sideway(stdout: &mut RawTerminal<io::Stdout>, dir: MoveDir, amount: u16) {
+    if dir == MoveDir::Left {
+        write!(stdout, "{}", cursor::Left(amount)).unwrap();
+    } else {
+        write!(stdout, "{}", cursor::Right(amount)).unwrap();
+    }
+    stdout.flush().unwrap();
+}
+
+fn move_cursor_to_pos(stdout: &mut RawTerminal<io::Stdout>, x: u16, y: u16) {
+    write!(stdout, "{}", cursor::Goto(x, y)).unwrap();
+    stdout.flush().unwrap();
+}
+
+fn clear_after_cursor(stdout: &mut RawTerminal<io::Stdout>) {
+    write!(stdout, "{}", termion::clear::AfterCursor).unwrap();
+    stdout.flush().unwrap();
+}
+
+fn put_text_after_prompt(
+    stdout: &mut RawTerminal<io::Stdout>,
+    prompt_len: usize,
+    text: &str,
+    input: &mut String,
+    write_index: &mut usize,
+) {
+    let (_, y) = stdout.cursor_pos().unwrap();
+    move_cursor_to_pos(stdout, (prompt_len + 1) as u16, y);
+    clear_after_cursor(stdout);
+
+    let (mut x, y) = stdout.cursor_pos().unwrap();
+    x += text.len() as u16;
+
+    *input = String::from(text);
+    *write_index = input.len();
+
+    println!("{text}");
+    move_cursor_to_pos(stdout, x, y);
+}
+
+fn get_user_input() -> String {
+    let mut stdout = io::stdout().into_raw_mode().unwrap();
+    let mut input = String::new();
+    let mut write_index = 0;
+    let prompt = "[virt-manager]# ".to_string();
+
+    let mut prompt_with_ansi = prompt.clone();
+    if let Some(idx) = prompt.find('#') {
+        prompt_with_ansi.insert_str(idx + 1, "\x1b[0m");
+        prompt_with_ansi.insert_str(idx, "\x1b[32m");
+    }
+
+    print!("{prompt_with_ansi}");
     io::stdout().flush().unwrap();
-    io::stdin()
-        .read_line(&mut input)
-        .expect("Failed to read line");
+
+    for c in io::stdin().keys() {
+        match c.unwrap() {
+            Key::Up => {
+                put_text_after_prompt(
+                    &mut stdout,
+                    prompt.len(),
+                    "Up arrow pressed",
+                    &mut input,
+                    &mut write_index,
+                );
+            }
+            Key::Down => {
+                put_text_after_prompt(
+                    &mut stdout,
+                    prompt.len(),
+                    "Down arrow pressed",
+                    &mut input,
+                    &mut write_index,
+                );
+            }
+            Key::Left => {
+                if write_index > 0 {
+                    write_index -= 1;
+                    move_cursor_sideway(&mut stdout, MoveDir::Left, 1);
+                }
+            }
+            Key::Right => {
+                if write_index < input.len() {
+                    write_index += 1;
+                    move_cursor_sideway(&mut stdout, MoveDir::Right, 1);
+                }
+            }
+            Key::Char(ch) => {
+                if ch == '\n' {
+                    write!(stdout, "\n\r").unwrap();
+                    stdout.flush().unwrap();
+                    break;
+                } else {
+                    write!(stdout, "{ch}").unwrap();
+                    stdout.flush().unwrap();
+
+                    input.insert(write_index, ch);
+                    write_index += 1;
+
+                    // Restore what's after the character
+                    if write_index != input.len() {
+                        write!(stdout, "{}", &input[write_index..],).unwrap();
+                        stdout.flush().unwrap();
+
+                        move_cursor_sideway(
+                            &mut stdout,
+                            MoveDir::Left,
+                            (input.len() - write_index) as u16,
+                        );
+                    }
+                }
+            }
+            Key::Backspace => {
+                if write_index > 0 {
+                    write_index -= 1;
+                    input.remove(write_index);
+
+                    let (x, y) = stdout.cursor_pos().unwrap();
+                    move_cursor_sideway(&mut stdout, MoveDir::Left, 1);
+                    clear_after_cursor(&mut stdout);
+
+                    if write_index < input.len() {
+                        write!(stdout, "{}", &input[(write_index)..]).unwrap();
+                        stdout.flush().unwrap();
+
+                        move_cursor_to_pos(&mut stdout, x - 1, y);
+                    }
+                }
+            }
+            _ => {}
+        }
+    }
 
     input.trim().to_string()
 }
