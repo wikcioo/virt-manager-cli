@@ -1,7 +1,5 @@
 # Virt Manager Cli
 
-### This project is currently under development and is not yet suitable for usage!
-
 A command-line program to mange your virtual machines, based on QEMU - the open-source virtualization software.
 
 ## Features:
@@ -10,6 +8,7 @@ A command-line program to mange your virtual machines, based on QEMU - the open-
 * Start
 * List
 * Get disk usage
+* Cursor movement in the prompt
 
 ## How to run?
 **Note**: this project has only been tested on Linux
