@@ -2,7 +2,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::json;
 use std::cmp::Ordering;
 use std::env;
-use std::fs::{self, File};
+use std::fs::{self, File, OpenOptions};
 use std::io::{self, Read, Write};
 use std::path::{Path, PathBuf};
 use std::process::{exit, Command};
@@ -46,11 +46,16 @@ fn start_interactive_mode() {
 
     loop {
         let input = get_user_input(&mut cmd_history);
-        parse_user_input(&input);
+        let result = parse_user_input(&input);
+
+        if let Some(cmd) = result {
+            save_cmd_to_history(cmd);
+            cmd_history.push(cmd.to_string());
+        }
     }
 }
 
-fn parse_user_input(input: &str) {
+fn parse_user_input(input: &str) -> Option<&str> {
     let args: Vec<&str> = input.split_whitespace().collect();
 
     if !args.is_empty() {
@@ -96,9 +101,14 @@ fn parse_user_input(input: &str) {
             }
             _ => {
                 println!("Command '{input}' is not supported!");
+                return None;
             }
         }
+
+        return Some(input);
     }
+
+    None
 }
 
 fn create_vm() {
@@ -470,36 +480,40 @@ fn get_user_input(cmd_history: &mut Vec<String>) -> String {
     for c in io::stdin().keys() {
         match c.unwrap() {
             Key::Up => {
-                cmd_his_index = cmd_his_index.saturating_sub(1);
+                if !cmd_history.is_empty() {
+                    cmd_his_index = cmd_his_index.saturating_sub(1);
 
-                put_text_after_prompt(
-                    &mut stdout,
-                    prompt.len(),
-                    &cmd_history[cmd_his_index],
-                    &mut input,
-                    &mut write_index,
-                );
+                    put_text_after_prompt(
+                        &mut stdout,
+                        prompt.len(),
+                        &cmd_history[cmd_his_index],
+                        &mut input,
+                        &mut write_index,
+                    );
+                }
             }
             Key::Down => {
-                let text_to_print: &str = match cmd_his_index.cmp(&(cmd_history.len() - 1)) {
-                    Ordering::Less => {
-                        cmd_his_index += 1;
-                        &cmd_history[cmd_his_index]
-                    }
-                    Ordering::Equal => {
-                        cmd_his_index += 1;
-                        ""
-                    }
-                    Ordering::Greater => "",
-                };
+                if !cmd_history.is_empty() {
+                    let text_to_print: &str = match cmd_his_index.cmp(&(cmd_history.len() - 1)) {
+                        Ordering::Less => {
+                            cmd_his_index += 1;
+                            &cmd_history[cmd_his_index]
+                        }
+                        Ordering::Equal => {
+                            cmd_his_index += 1;
+                            ""
+                        }
+                        Ordering::Greater => "",
+                    };
 
-                put_text_after_prompt(
-                    &mut stdout,
-                    prompt.len(),
-                    text_to_print,
-                    &mut input,
-                    &mut write_index,
-                );
+                    put_text_after_prompt(
+                        &mut stdout,
+                        prompt.len(),
+                        text_to_print,
+                        &mut input,
+                        &mut write_index,
+                    );
+                }
             }
             Key::Left => {
                 if write_index > 0 {
@@ -567,6 +581,7 @@ fn get_cmd_history() -> Vec<String> {
 
     if !Path::new(&his_file).exists() {
         File::create(&his_file).unwrap();
+        return vec![];
     }
 
     let mut file = File::open(&his_file).unwrap();
@@ -581,6 +596,19 @@ fn get_cmd_history() -> Vec<String> {
         .collect();
 
     commands
+}
+
+fn save_cmd_to_history(cmd: &str) {
+    let his_file = get_program_directory_abs_path() + "/.history";
+
+    if !Path::new(&his_file).exists() {
+        File::create(&his_file).unwrap();
+    }
+
+    let mut file = OpenOptions::new().append(true).open(&his_file).unwrap();
+
+    let bytes_to_write = [cmd.to_string().as_bytes(), b"\n"].concat();
+    file.write_all(&bytes_to_write).unwrap();
 }
 
 fn print_usage() {
